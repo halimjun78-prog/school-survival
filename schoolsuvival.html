@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>학교에서 살아남아라!</title>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_six@1.2/DungGeunMo.woff');
+
+        :root { --pixel-border: 4px solid #000; }
+        * { box-sizing: border-box; font-family: 'DungGeunMo', monospace; user-select: none; }
+        body { margin: 0; padding: 0; background-color: #222; color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; touch-action: manipulation; }
+        
+        #game-container {
+            width: 100%; max-width: 600px; height: 100%; max-height: 900px;
+            position: relative; background: #fff; box-shadow: 0 0 20px rgba(0,0,0,0.8); overflow: hidden;
+        }
+
+        /* 1. 코인 UI (강조된 고정 박스) */
+        #coin-box {
+            position: absolute; top: 15px; right: 15px; z-index: 9999;
+            border: 4px solid black; background: white; font-size: 24px;
+            padding: 10px; box-shadow: 4px 4px 0 #000; font-weight: bold;
+            display: none;
+        }
+
+        /* --- 배경 (픽셀 스타일) --- */
+        .bg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; display: none; }
+        .bg-school-out { background: linear-gradient(#87CEEB 50%, #8b4513 50%); background-size: 100% 100%; overflow: hidden; }
+        /* 3. 움직이는 학교 배경 (애니메이션 적용) */
+        .bg-school-out::after {
+            content: ''; position: absolute; bottom: 50%; left: 0; width: 300%; height: 30%;
+            background: #d2b48c; border: var(--pixel-border); border-bottom: none;
+            box-shadow: inset 10px 10px 0 rgba(255,255,255,0.2), inset -10px -10px 0 rgba(0,0,0,0.2);
+            background-image: repeating-linear-gradient(90deg, transparent, transparent 20px, #8B4513 20px, #8B4513 24px),
+                              repeating-linear-gradient(0deg, transparent, transparent 20px, #8B4513 20px, #8B4513 24px);
+            animation: panSchool 5s linear infinite;
+        }
+        @keyframes panSchool { 0% { transform: translateX(0); } 100% { transform: translateX(-33.33%); } }
+
+        .bg-hallway { background: linear-gradient(#e0e0e0 40%, #a9a9a9 40%, #808080); --bg-x: 0px; }
+        .bg-hallway::before {
+            content: ''; position: absolute; top: 20%; left: 0; width: 100%; height: 20%;
+            background: #607d8b; border-top: var(--pixel-border); border-bottom: var(--pixel-border);
+            background-image: repeating-linear-gradient(90deg, transparent, transparent 30px, #000 30px, #000 34px);
+            background-position: var(--bg-x) 0;
+        }
+        .bg-classroom { background: linear-gradient(#f5f5dc 40%, #deb887 40%); overflow: hidden; }
+        
+        /* 칠판 */
+        .blackboard {
+            position: absolute; top: 5%; left: 15%; width: 70%; height: 25%;
+            background: #2E5C31; border: 8px solid #8B4513; box-shadow: 4px 4px 0 #000;
+            color: white; padding: 10px; display: flex; flex-direction: column; justify-content: center;
+            text-align: center; z-index: 1; font-size: 14px;
+        }
+
+        /* 교실 책상 및 학생들 생성 영역 */
+        #desks-container { position: absolute; top: 45%; left: 0; width: 100%; height: 55%; z-index: 2; pointer-events: none; }
+        .desk-group { position: absolute; width: 60px; height: 80px; }
+        .desk { position: absolute; bottom: 0; left: 5px; width: 50px; height: 35px; background: #cd853f; border: 2px solid #000; z-index: 3; }
+        .chair { position: absolute; bottom: 10px; left: 15px; width: 30px; height: 35px; background: #8b4513; border: 2px solid #000; z-index: 1; border-radius: 5px 5px 0 0; }
+        .pixel-friend { position: absolute; bottom: 15px; left: 10px; width: 40px; height: 70px; z-index: 2; }
+        
+        .sitting .pl-leg { display: none !important; }
+        .sitting .pl-arm.left { transform: rotate(110deg); top: 40px; left: -5px;}
+        .sitting .pl-arm.right { transform: rotate(-110deg); top: 40px; right: -5px;}
+
+        .bg-yard { background: linear-gradient(#87CEEB 40%, #228B22 40%); }
+
+        /* --- 캐릭터 (픽셀 스타일) --- */
+        #pixel-player {
+            position: absolute; bottom: 10%; left: 50%; transform: translateX(-50%);
+            width: 40px; height: 70px; display: none; z-index: 5;
+        }
+        .pl-head { position: absolute; top: 10px; left: 5px; width: 30px; height: 25px; background: #ffcc99; border: 3px solid #000; z-index: 2; }
+        .pl-hair { position: absolute; top: 0; left: 2px; width: 36px; height: 15px; background: #000; border: 3px solid #000; z-index: 3; }
+        .pl-eye { position: absolute; top: 10px; width: 4px; height: 4px; background: #000; z-index: 4; }
+        .pl-eye.left { left: 8px; } .pl-eye.right { right: 8px; }
+        .pl-body { position: absolute; top: 35px; left: 10px; width: 20px; height: 20px; background: #3498db; border: 3px solid #000; z-index: 1; }
+        .pl-arm { position: absolute; top: 35px; width: 8px; height: 16px; background: #ffcc99; border: 3px solid #000; z-index: 0; transform-origin: top center;}
+        .pl-arm.left { left: -2px; transform: rotate(15deg); } .pl-arm.right { right: -2px; transform: rotate(-15deg); }
+        .pl-leg { position: absolute; top: 55px; width: 8px; height: 15px; background: #333; border: 3px solid #000; z-index: 0; transform-origin: top center;}
+        .pl-leg.left { left: 10px; } .pl-leg.right { right: 10px; }
+
+        /* --- 선생님 캐릭터 --- */
+        #teacher-sprite {
+            position: absolute; top: 30%; left: -60px; /* 화면 밖 시작 */
+            width: 50px; height: 80px; z-index: 4; transition: left 1s linear; display: none;
+        }
+        .tc-head { position: absolute; top: 0; left: 10px; width: 30px; height: 30px; background: #ffcc99; border: 3px solid #000; }
+        .tc-body { position: absolute; top: 30px; left: 5px; width: 40px; height: 50px; background: #607d8b; border: 3px solid #000; }
+        .tc-glasses { position: absolute; top: 10px; left: 12px; width: 26px; height: 10px; border: 2px solid #000; border-radius: 2px; }
+
+        /* --- 공통 UI --- */
+        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; align-items: center; padding: 20px; z-index: 10; background: rgba(0,0,0,0.6); }
+        .screen.active { display: flex; }
+        .panel { background: #fff; border: var(--pixel-border); padding: 15px; width: 95%; text-align: center; margin-top: 5vh; box-shadow: 6px 6px 0 #000; position: relative; max-height: 80vh; overflow-y: auto;}
+        
+        h1.pixel-title { font-size: 60px; color: #fff; text-shadow: -4px -4px 0 #000, 4px -4px 0 #000, -4px 4px 0 #000, 4px 4px 0 #000, 6px 6px 0 #555; z-index: 2; margin-top: 10vh; line-height: 1.3; text-align: center; width: 100%; display: flex; justify-content: center; }
+        
+        button { font-size: 16px; padding: 10px 15px; margin: 5px; background: #fff; border: var(--pixel-border); box-shadow: 4px 4px 0 #000; cursor: pointer; transition: transform 0.1s; }
+        button:active { transform: translate(4px, 4px); box-shadow: none; }
+        button:disabled { background: #555; box-shadow: 4px 4px 0 #222; color: #aaa; cursor: not-allowed; }
+        .btn-locked { background: #666; color: #ccc; }
+        
+        .btn-icon { position: absolute; width: 40px; height: 40px; background: #fff; border: var(--pixel-border); box-shadow: 2px 2px 0 #000; font-size: 20px; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 100; }
+        .btn-icon:active { transform: translate(2px, 2px); box-shadow: none; }
+        #btn-settings { top: 15px; left: 15px; }
+
+        .back-btn { position: absolute; top: -15px; left: -15px; background: #ff4757; color: white; padding: 5px 10px; font-size: 16px; border: var(--pixel-border); z-index: 10;}
+
+        /* 상단 상태창 (Top-right HUD) */
+        #status-board { position: absolute; top: 15px; right: 15px; width: auto; background: rgba(255,255,255,0.9); border: var(--pixel-border); padding: 10px 15px; z-index: 9999; display: none; box-shadow: 4px 4px 0 #000; }
+        .status-text { font-size: 18px; text-align: left; font-weight: bold; margin-bottom: 5px; color: #000; text-shadow: none; }
+        .bar-bg { display: none; } /* 기존 바 숨김 처리 */
+        
+        /* 1. 코인 UI 숨김 (통합됨) */
+        #coin-box { display: none; }
+
+        /* 말풍선 */
+        .speech-bubble { position: relative; background: #fff; border: var(--pixel-border); padding: 15px; font-size: 16px; margin-bottom: 20px; box-shadow: 4px 4px 0 #000; line-height: 1.5; width: 100%; text-align: left; min-height: 80px;}
+        .speech-bubble::after { content: ''; position: absolute; bottom: -15px; left: 30px; border-width: 15px 15px 0; border-style: solid; border-color: #000 transparent transparent transparent; }
+        .speech-bubble::before { content: ''; position: absolute; bottom: -10px; left: 32px; border-width: 12px 12px 0; border-style: solid; border-color: #fff transparent transparent transparent; z-index: 1; }
+
+        /* 모달 */
+        .modal-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 999; justify-content: center; align-items: center; }
+        .modal-content { background: #fff; border: var(--pixel-border); padding: 20px; width: 80%; text-align: center; box-shadow: 6px 6px 0 #000; }
+        
+        /* 34. 스플래시 화면 애니메이션 */
+        @keyframes floatTitle { 0% { transform: translateY(0px); } 50% { transform: translateY(-20px); } 100% { transform: translateY(0px); } }
+        #splash-title { animation: floatTitle 2s ease-in-out infinite; }
+        
+        /* 일시정지 버튼 */
+        #btn-pause { position: absolute; top: 15px; left: 15px; z-index: 100; font-size: 16px; padding: 5px 10px; background: #fff; border: var(--pixel-border); box-shadow: 2px 2px 0 #000; cursor: pointer; display: none; font-weight: bold; }
+        #btn-pause:active { transform: translate(2px, 2px); box-shadow: none; }
+        
+        /* 체육 미니게임 */
+        #pe-game { display: none; width: 100%; position: absolute; top: 40%; text-align: center; z-index: 20; }
+        #pe-bar-bg { width: 80%; height: 30px; background: #222; border: 4px solid #fff; margin: 10px auto; position: relative; overflow: hidden; }
+        #timing-zone { position: absolute; top: 0; height: 100%; background: #4caf50; }
+        #timing-cursor { position: absolute; top: -5px; width: 10px; height: 40px; background: #ff4757; border: 2px solid #fff; }
+        #pe-object { position: absolute; font-size: 40px; z-index: 10; display: none; transition: 0.1s linear;}
+        
+        .shop-item { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; padding: 5px 0;}
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- 1. 거대한 코인 박스 (숨김) -->
+    <div id="coin-box">🪙 코인: <span id="coin-text-top">0</span></div>
+
+    <!-- 배경 -->
+    <div id="bg-school-out" class="bg-layer bg-school-out" style="display:block;"></div>
+    <div id="bg-hallway" class="bg-layer bg-hallway"></div>
+    <div id="bg-classroom" class="bg-layer bg-classroom">
+        <div class="blackboard" id="bb-content" style="display:none;"></div>
+        <div id="desks-container"></div>
+    </div>
+    <div id="bg-yard" class="bg-layer bg-yard"></div>
+
+    <!-- 기존 톱니바퀴 대신 일시정지 버튼 -->
+    <button id="btn-pause" onclick="openPauseMenu()">❚❚ 멈추기</button>
+
+    <!-- 상단 통합 상태창 (HUD) -->
+    <div id="status-board">
+        <div class="status-text">🪙 코인: <span id="coin-text">0</span></div>
+        <div class="status-text">🍗 허기: <span id="hunger-text">100</span></div>
+        <div class="status-text">💯 점수: <span id="score-text">50.0</span></div>
+    </div>
+
+    <!-- 캐릭터 -->
+    <div id="pixel-player">
+        <div class="cm-name" id="player-name-tag" style="position:absolute; top:-20px; left:-10px; font-size:10px; width:60px; text-align:center; background:rgba(255,255,255,0.7); border:1px solid #000; display:none;"></div>
+        <div class="pl-hair" id="pl-hair"></div>
+        <div class="pl-head"><div class="pl-eye left"></div><div class="pl-eye right"></div></div>
+        <div class="pl-body" id="pl-body"></div>
+        <div class="pl-arm left" id="pl-arm-l"></div><div class="pl-arm right" id="pl-arm-r"></div>
+        <div class="pl-leg left" id="pl-leg-l"></div><div class="pl-leg right" id="pl-leg-r"></div>
+    </div>
+    
+    <div id="teacher-sprite">
+        <div class="tc-head"><div class="tc-glasses"></div></div>
+        <div class="tc-body"></div>
+    </div>
+
+    <!-- 0. 스플래시 화면 (타이틀 화면) -->
+    <div id="screen-splash" class="screen active" style="background:#222; justify-content: center;">
+        <h1 id="splash-title" class="pixel-title" style="margin-top: 0; margin-bottom: 50px;">학교에서<br>살아남기!</h1>
+        <button onclick="startGameFromSplash()" style="font-size:32px; padding:15px 40px; font-weight:bold; background:#ffd700; animation: pulse 1.5s infinite;">시작하기</button>
+    </div>
+    
+    <style>@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }</style>
+
+    <!-- 1. 메인 (학년 선택) -->
+    <div id="screen-main" class="screen">
+        <div class="panel">
+            <button class="btn-icon" id="btn-settings" onclick="openSettings()">⚙️</button>
+            <h2 style="margin-top:10px; font-size: 32px;">메인 메뉴</h2>
+            <button onclick="selectGrade(1)" style="font-size:20px; padding:10px 20px; margin:10px; width:80%;">1학년</button><br>
+            <button onclick="selectGrade(2)" style="font-size:20px; padding:10px 20px; margin:10px; width:80%;">2학년</button><br>
+            <button onclick="selectGrade(3)" style="font-size:20px; padding:10px 20px; margin:10px; width:80%;">3학년</button><br>
+            <button onclick="showScreen('screen-shop')" style="margin-top:20px; background:#ffd700; font-size:18px; padding:10px; width:80%;">상점 가기</button>
+        </div>
+    </div>
+
+    <!-- 상점 -->
+    <div id="screen-shop" class="screen">
+        <div class="panel">
+            <button class="back-btn" onclick="showScreen('screen-main')">◀ 뒤로</button>
+            <h2>상점 (내 코인: <span id="shop-coin-text">0</span>)</h2>
+            <div class="shop-item"><span>1. 간식 (허기 30회복, 휴식 시 행동소모X)</span> <button onclick="buyItem('snack', 1000)">1000c</button></div>
+            <div class="shop-item"><span>2. 발표 면제권 (수업 문제 패스)</span> <button onclick="buyItem('skip', 5000)">5000c</button></div>
+            <div class="shop-item"><span>3. 마법 지우개 (오답 2개 즉시 제거)</span> <button onclick="buyItem('eraser', 3000)">3000c</button></div>
+            <div class="shop-item"><span>4. 체육복 대여 (체육 자동 성공)</span> <button onclick="buyItem('peClothes', 2000)">2000c</button></div>
+            <div style="margin-top:10px;">
+                <p style="font-size:12px;">보유: 간식(<span id="inv-snack">0</span>) 면제권(<span id="inv-skip">0</span>) 지우개(<span id="inv-eraser">0</span>) 체육복(<span id="inv-peClothes">0</span>)</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 난이도 선택 -->
+    <div id="screen-diff" class="screen">
+        <div class="panel">
+            <button class="back-btn" onclick="showScreen('screen-main')">◀ 뒤로</button>
+            <h2 id="diff-title" style="margin-top:10px;">난이도 선택</h2>
+            <button id="btn-diff-easy" onclick="selectDifficulty('easy')">쉬움</button><br>
+            <button id="btn-diff-normal" onclick="selectDifficulty('normal')">보통</button><br>
+            <button id="btn-diff-hard" onclick="selectDifficulty('hard')">어려움</button>
+        </div>
+    </div>
+
+    <!-- 3. 캐릭터 생성 -->
+    <div id="screen-create" class="screen">
+        <div class="panel">
+            <button class="back-btn" onclick="showScreen('screen-diff')">◀ 뒤로</button>
+            <h2 style="margin-top:10px;">학생증 발급</h2>
+            <div style="display:flex; justify-content:center; align-items:center; margin-bottom:10px; gap: 10px;">
+                <input type="text" id="playerName" placeholder="이름 (2~4자)" maxlength="4" style="font-size:20px; text-align:center; padding:5px; width:60%; border:var(--pixel-border);">
+                <button onclick="recommendName()" style="font-size:16px; padding:5px 10px; margin:0; background:#3498db; color:white;">추천</button>
+            </div>
+            <p style="margin:5px;">남은 포인트: <span id="points-left" style="color:red; font-weight:bold;">10</span></p>
+            
+            <div style="display:flex; justify-content:space-between; margin: 10px 0;"><span>🏃 운동</span><div><button style="padding:2px 10px;" onclick="adjustStat('str', -1)">-</button> <span id="stat-str">0</span> <button style="padding:2px 10px;" onclick="adjustStat('str', 1)">+</button></div></div>
+            <div style="display:flex; justify-content:space-between; margin: 10px 0;"><span>😇 인성</span><div><button style="padding:2px 10px;" onclick="adjustStat('cha', -1)">-</button> <span id="stat-cha">0</span> <button style="padding:2px 10px;" onclick="adjustStat('cha', 1)">+</button></div></div>
+            <div style="display:flex; justify-content:space-between; margin: 10px 0;"><span>🧠 지능</span><div><button style="padding:2px 10px;" onclick="adjustStat('int', -1)">-</button> <span id="stat-int">0</span> <button style="padding:2px 10px;" onclick="adjustStat('int', 1)">+</button></div></div>
+            <div style="display:flex; justify-content:space-between; margin: 10px 0;"><span>🤝 친밀</span><div><button style="padding:2px 10px;" onclick="adjustStat('soc', -1)">-</button> <span id="stat-soc">0</span> <button style="padding:2px 10px;" onclick="adjustStat('soc', 1)">+</button></div></div>
+            
+            <button onclick="confirmCharacter()" style="width:100%; margin-top:15px;">입학하기</button>
+        </div>
+    </div>
+
+    <!-- 4. 게임 공용 UI -->
+    <div id="screen-game-ui" class="screen" style="background:transparent; justify-content: flex-end; padding-bottom: 20px; pointer-events: none;">
+        
+        <div id="run-ui" style="display:none; pointer-events: auto; text-align:center; width: 100%;">
+            <div id="timer-display" style="background:white; padding:5px; border:var(--pixel-border); font-size:24px; color:red; font-weight:bold; margin-bottom:10px; display:inline-block;">10:00</div><br>
+            <div id="run-sign" style="background:rgba(0,0,0,0.7); color:white; padding:5px; margin-bottom:10px; border:2px solid white; display:inline-block; font-size:18px;"></div><br>
+            <button style="width:200px; height:80px; font-size:24px; background:#ff4757; color:white; border-radius:40px;" onclick="doRunClick()">달려라!! 탭!</button>
+        </div>
+
+        <div id="dialog-ui" style="display:none; pointer-events: auto; width: 100%;">
+            <div class="speech-bubble" id="dialog-text">내용</div>
+            <div id="dialog-choices" style="display:flex; flex-direction:column; background:rgba(255,255,255,0.9); padding:10px; border:var(--pixel-border);"></div>
+        </div>
+    </div>
+
+    <!-- 체육 미니게임 UI -->
+    <div id="pe-game">
+        <h2 id="pe-title" style="color:white; text-shadow:2px 2px #000; background:rgba(0,0,0,0.5); display:inline-block; padding:5px;">수행평가</h2>
+        <div id="pe-bar-bg">
+            <div id="timing-zone"></div>
+            <div id="timing-cursor"></div>
+        </div>
+        <p style="color:white; font-weight:bold; text-shadow:2px 2px #000;">연속 성공: <span id="pe-count">0 / 3</span></p>
+    </div>
+    <div id="pe-object">🏐</div>
+
+    <!-- 모달 -->
+    <div id="modal-settings" class="modal-overlay">
+        <div class="modal-content">
+            <h2>설정</h2>
+            <div style="margin: 20px 0; text-align: left;">
+                <label>배경음 소리: <input type="range" id="bgm-slider" min="0" max="100" value="50" onchange="updateVolume()"></label><br><br>
+                <label>효과음 소리: <input type="range" id="sfx-slider" min="0" max="100" value="50" onchange="updateVolume()"></label>
+            </div>
+            <button onclick="closeModal('modal-settings')" style="margin-top:20px;">닫기</button>
+        </div>
+    </div>
+
+    <div id="modal-pause" class="modal-overlay">
+        <div class="modal-content">
+            <h2>일시정지</h2>
+            <button onclick="closeModal('modal-pause')" style="width:80%; margin:10px 0;">계속하기</button><br>
+            <button onclick="openSettings()" style="width:80%; margin:10px 0;">설정</button><br>
+            <button onclick="location.reload()" style="width:80%; margin:10px 0; background:#ff4757; color:white;">돌아가기</button>
+        </div>
+    </div>
+
+    <div id="modal-alert" class="modal-overlay">
+        <div class="modal-content">
+            <h2 id="alert-title">알림</h2>
+            <p id="alert-desc" style="font-size:16px; line-height:1.5;"></p>
+            <div id="alert-buttons" style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:15px;">
+                <button id="alert-btn" onclick="closeAlert()">확인</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    /* ---------------- 시스템: BGM & SFX ---------------- */
+    let audioCtx = null;
+    let bgmNextTime = 0;
+    let isBgmPlaying = false;
+    let bgmVolume = 0.5;
+    let sfxVolume = 0.5;
+    
+    function updateVolume() {
+        bgmVolume = document.getElementById('bgm-slider').value / 100;
+        sfxVolume = document.getElementById('sfx-slider').value / 100;
+    }
+
+    function initAudio() {
+        if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        startBGM();
+    }
+    
+    // 4. 신나는 축제 느낌의 무한 루프 스케줄링 BGM
+    function startBGM() {
+        if(isBgmPlaying) return;
+        isBgmPlaying = true;
+        
+        // 놀이공원/축제 풍의 빠르고 경쾌한 아르페지오 멜로디
+        const notes = [
+            261.63, 329.63, 392.00, 523.25, // C4, E4, G4, C5
+            523.25, 392.00, 329.63, 261.63, // C5, G4, E4, C4
+            349.23, 440.00, 523.25, 698.46, // F4, A4, C5, F5
+            698.46, 523.25, 440.00, 349.23  // F5, C5, A4, F4
+        ];
+        let idx = 0;
+        bgmNextTime = audioCtx.currentTime + 0.1;
+        
+        function schedule() {
+            if(!isBgmPlaying || !audioCtx) return;
+            while(bgmNextTime < audioCtx.currentTime + 0.5) {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'square';
+                osc.frequency.value = notes[idx];
+                gain.gain.setValueAtTime(0.04 * (bgmVolume * 2), bgmNextTime); // 경쾌한 볼륨 (설정값 반영)
+                gain.gain.exponentialRampToValueAtTime(0.001, bgmNextTime + 0.1); // 스타카토 느낌
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(bgmNextTime); osc.stop(bgmNextTime + 0.1);
+                idx = (idx + 1) % notes.length;
+                bgmNextTime += 0.15; // 템포를 빠르게
+            }
+            setTimeout(schedule, 50);
+        }
+        schedule();
+    }
+
+    function playSound(type) {
+        if(!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        let now = audioCtx.currentTime;
+        let sfxVol = sfxVolume * 2;
+        
+        if(type === 'click') {
+            osc.type = 'square'; osc.frequency.setValueAtTime(400, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+            gain.gain.setValueAtTime(0.3 * sfxVol, now); gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            osc.start(now); osc.stop(now + 0.1);
+        } else if(type === 'correct') {
+            osc.type = 'sine'; osc.frequency.setValueAtTime(600, now); osc.frequency.setValueAtTime(800, now + 0.1);
+            gain.gain.setValueAtTime(0.3 * sfxVol, now); gain.gain.linearRampToValueAtTime(0, now + 0.3);
+            osc.start(now); osc.stop(now + 0.3);
+        } else if(type === 'wrong') {
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, now); osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+            gain.gain.setValueAtTime(0.3 * sfxVol, now); gain.gain.linearRampToValueAtTime(0, now + 0.3);
+            osc.start(now); osc.stop(now + 0.3);
+        } else if(type === 'run') {
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(300 + Math.random()*200, now);
+            gain.gain.setValueAtTime(0.2 * sfxVol, now); gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            osc.start(now); osc.stop(now + 0.1);
+        }
+    }
+
+    /* ---------------- 상태 & 데이터 ---------------- */
+    let game = {
+        grade: 1, diffStr: 'normal', score: 50.0, hunger: 100, phase: 0, coins: 0,
+        player: { name: "", str: 0, cha: 0, int: 0, soc: 0, points: 10 },
+        inv: { snack: 0, skip: 0, eraser: 0, peClothes: 0 }
+    };
+    
+    // 진행도 및 상점 데이터 저장
+    let saves = JSON.parse(localStorage.getItem('schoolSurvivalSaves')) || { 
+        coins: 0, inv: { snack:0, skip:0, eraser:0, peClothes:0 },
+        unlocks: { g1_easy: 0, g1_normal: 0, g1_hard: 0, g2_easy: 0, g2_normal: 0, g2_hard: 0, g3_easy: 0, g3_normal: 0, g3_hard: 0 }
+    };
+    
+    function saveGameData() { localStorage.setItem('schoolSurvivalSaves', JSON.stringify(saves)); }
+
+    const friends = ["김철수", "이영희", "박지훈", "최수진", "정민수", "강하늘", "조서연", "윤도현", "임수아", "한지민", "송우진"];
+
+    function recommendName() {
+        playSound('click');
+        const randomNames = ["김학생", "이생존", "박눈치", "최열심", "정지각", "강체력", "조모범", "윤불량", "나주인"];
+        document.getElementById('playerName').value = randomNames[Math.floor(Math.random() * randomNames.length)];
+    }
+
+    // 2. 문제 100개 풀 자동 생성기 (학년별 문제 분리 완벽 적용)
+    let qDB = { 1:{}, 2:{}, 3:{} };
+    function initQDB() {
+        for(let g = 1; g <= 3; g++) {
+            qDB[g] = { "국어":[], "수학":[], "사회":[], "과학":[], "영어":[], "역사":[], "체육":[] };
+            
+            for(let i=1; i<=30; i++) {
+                // 수학
+                let a = Math.floor(Math.random()*(10*g))+1; let b = Math.floor(Math.random()*(10*g))+1;
+                let ans = (g===1) ? (a+b) : (g===2) ? (a*b) : (a*b+a);
+                let op = (g===1) ? "+" : (g===2) ? "x" : "x( )+";
+                let qStr = (g===3) ? `${a} x ${b} + ${a} = ?` : `${a} ${op} ${b} = ?`;
+                let wM = [ans-2, ans-1, ans+1]; if(wM.includes(ans)) wM[wM.indexOf(ans)] = ans+3;
+                let cMath = [ans, ...wM].sort(()=>Math.random()-0.5);
+                let sMath = (g===1) ? "시장에서 물건을 살 때 덧셈은 필수지." : (g===2) ? "구구단을 외우면 계산이 훨씬 빨라진단다." : "혼합 계산은 순서가 생명이야! 곱셈부터 해야 해.";
+                qDB[g]["수학"].push({ s: sMath, q: `[${g}학년 수학] ${qStr}`, c: cMath, a: cMath.indexOf(ans) });
+                
+                // 국어
+                let kCorrect = (g===1) ? "설거지" : (g===2) ? "오랜만에" : "며칠"; 
+                let kW = (g===1) ? ["설겆이", "설거지이", "셜거지"] : (g===2) ? ["오랫만에","오렌만에","오랜만해"] : ["몇일","몇 칠","면칠"];
+                let cKor = [kCorrect, ...kW].sort(()=>Math.random()-0.5);
+                let sKor = (g===1) ? "우리가 매일 쓰는 우리말, 맞춤법을 정확히 알아야겠지?" : (g===2) ? "말을 할 때는 쉬워도 막상 글로 적을 때 헷갈리는 단어들이 많아." : "올바른 띄어쓰기와 맞춤법은 글의 품격을 결정한단다.";
+                qDB[g]["국어"].push({ s: sKor, q:`[${g}학년 국어] 올바른 맞춤법은?`, c:cKor, a:cKor.indexOf(kCorrect) });
+                
+                // 영어
+                let eC = "am"; let eW = ["are","is","be"];
+                let cEng = [eC, ...eW].sort(()=>Math.random()-0.5);
+                let sEng = "글로벌 시대에 영어는 필수지. 주어에 맞는 be동사를 찾는 게 기초란다.";
+                qDB[g]["영어"].push({ s: sEng, q:`[${g}학년 영어] I (  ) a student.`, c:cEng, a:cEng.indexOf(eC) });
+                
+                // 과학
+                let sC = "H2O"; let sW = ["CO2","O2","NaCl"];
+                let cSci = [sC, ...sW].sort(()=>Math.random()-0.5);
+                let sSci = "우리가 매일 마시는 물, 이 물도 사실 아주 작은 원소들로 이루어져 있어.";
+                qDB[g]["과학"].push({ s: sSci, q:`[${g}학년 과학] 물의 화학 기호는 무엇인가?`, c:cSci, a:cSci.indexOf(sC) });
+                
+                // 사회
+                let soC = "서울"; let soW = ["부산","대구","인천"];
+                let cSoc = [soC, ...soW].sort(()=>Math.random()-0.5);
+                let sSoc = "우리나라의 중심지가 어딘지 아는 것은 기본 중의 기본이야.";
+                qDB[g]["사회"].push({ s: sSoc, q:`[${g}학년 사회] 대한민국의 수도는?`, c:cSoc, a:cSoc.indexOf(soC) });
+                
+                // 역사
+                let hC = "1592년"; let hW = ["1392년","1919년","1945년"];
+                let cHis = [hC, ...hW].sort(()=>Math.random()-0.5);
+                let sHis = "과거를 잊은 민족에게 미래는 없다! 중요한 역사적 사실은 꼭 기억해라.";
+                qDB[g]["역사"].push({ s: sHis, q:`[${g}학년 역사] 임진왜란이 일어난 해는?`, c:cHis, a:cHis.indexOf(hC) });
+            }
+        }
+    }
+    initQDB();
+    
+    let schedule = [];
+    let isPaused = false;
+    let timerInterval = null; let timerRemaining = 0; let timerCallback = null;
+    let typingInterval = null;
+    let todayScheduleHTML = "";
+    
+    function startGameFromSplash() {
+        initAudio();
+        playSound('click');
+        showScreen('screen-main');
+    }
+
+    /* ---------------- 렌더링 및 UI ---------------- */
+    function showScreen(id) {
+        playSound('click');
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        
+        // 1. 코인 박스는 상시 고정 노출되도록 처리
+        document.getElementById('coin-box').style.display = 'block';
+        document.getElementById('coin-text-top').innerText = saves.coins;
+        
+        if(id === 'screen-main' || id === 'screen-shop') {
+            document.getElementById('shop-coin-text').innerText = saves.coins;
+            document.getElementById('inv-snack').innerText = saves.inv.snack;
+            document.getElementById('inv-skip').innerText = saves.inv.skip;
+            document.getElementById('inv-eraser').innerText = saves.inv.eraser;
+            document.getElementById('inv-peClothes').innerText = saves.inv.peClothes;
+        }
+    }
+
+    function setBackground(type) {
+        document.querySelectorAll('.bg-layer').forEach(bg => bg.style.display = 'none');
+        document.getElementById('bb-content').style.display = 'none';
+        
+        if(type === 'outside') document.getElementById('bg-school-out').style.display = 'block';
+        if(type === 'hallway') document.getElementById('bg-hallway').style.display = 'block';
+        if(type === 'class') {
+            document.getElementById('bg-classroom').style.display = 'block';
+            document.getElementById('bb-content').innerHTML = todayScheduleHTML;
+            document.getElementById('bb-content').style.display = 'flex';
+            
+            let p = document.getElementById('pixel-player');
+            p.classList.add('sitting');
+            p.style.bottom = '15px'; p.style.left = '10px'; p.style.transform = 'none';
+            document.getElementById('player-name-tag').innerText = game.player.name;
+            document.getElementById('player-name-tag').style.display = 'block';
+            let deskGroup = document.getElementById('player-desk-group');
+            if(deskGroup) deskGroup.insertBefore(p, deskGroup.querySelector('.desk'));
+        } else {
+            let p = document.getElementById('pixel-player');
+            p.classList.remove('sitting');
+            p.style.bottom = '10%'; p.style.left = '50%'; p.style.transform = 'translateX(-50%)';
+            document.getElementById('player-name-tag').style.display = 'none';
+            document.getElementById('game-container').appendChild(p);
+        }
+        if(type === 'yard') document.getElementById('bg-yard').style.display = 'block';
+    }
+
+    function renderDesks() {
+        let dc = document.getElementById('desks-container');
+        dc.innerHTML = '';
+        let friendIdx = 0;
+        for(let r=0; r<3; r++) {
+            for(let c=0; c<4; c++) {
+                let desk = document.createElement('div'); desk.className = 'desk-group';
+                desk.style.left = `${10 + c*22}%`; desk.style.top = `${10 + r*30}%`;
+                
+                let isPlayerDesk = (r === 2 && c === 3);
+                if (isPlayerDesk) desk.id = 'player-desk-group';
+                let fName = isPlayerDesk ? "" : friends[friendIdx++];
+                
+                let friendHtml = isPlayerDesk ? "" : `
+                    <div class="pixel-friend sitting">
+                        <div class="cm-name" style="position:absolute; top:-20px; left:-10px; font-size:10px; width:60px; text-align:center; background:rgba(255,255,255,0.7); border:1px solid #000;">${fName}</div>
+                        <div class="pl-head" style="background:#ddd;"><div class="pl-eye left"></div><div class="pl-eye right"></div></div>
+                        <div class="pl-body" style="background:#607d8b;"></div>
+                        <div class="pl-arm left"></div><div class="pl-arm right"></div>
+                    </div>
+                `;
+                
+                desk.innerHTML = `
+                    <div class="chair"></div>
+                    ${friendHtml}
+                    <div class="desk"></div>
+                `;
+                dc.appendChild(desk);
+            }
+        }
+    }
+    renderDesks(); // 초기 1회 생성
+
+    /* ---------------- 상점 및 난이도 해금 ---------------- */
+    function buyItem(id, price) {
+        playSound('click');
+        if(saves.coins >= price) {
+            saves.coins -= price; saves.inv[id]++; saveGameData();
+            showScreen('screen-shop');
+            openAlert("구매 완료", "아이템을 구매했습니다!");
+        } else {
+            openAlert("잔액 부족", "코인이 부족합니다.");
+        }
+    }
+
+    function selectGrade(g) { 
+        game.grade = g; 
+        document.getElementById('diff-title').innerText = `${g}학년 - 난이도 선택`; 
+        
+        // 잠금 해제 확인 (쉬움은 기본, 보통은 쉬움 클리어시, 어려움은 보통 클리어시)
+        let nOk = saves.unlocks[`g${g}_easy`] > 0;
+        let hOk = saves.unlocks[`g${g}_normal`] > 0;
+        
+        let bn = document.getElementById('btn-diff-normal');
+        let bh = document.getElementById('btn-diff-hard');
+        
+        bn.disabled = !nOk; bn.className = nOk ? '' : 'btn-locked';
+        bh.disabled = !hOk; bh.className = hOk ? '' : 'btn-locked';
+        
+        showScreen('screen-diff'); 
+    }
+
+    function selectDifficulty(d) {
+        game.diffStr = d; showScreen('screen-create');
+    }
+
+    /* ---------------- 시작 설정 ---------------- */
+    function adjustStat(stat, val) {
+        playSound('click');
+        if(val > 0 && game.player.points > 0 && game.player[stat] < 10) { game.player[stat]++; game.player.points--; }
+        else if(val < 0 && game.player[stat] > 0) { game.player[stat]--; game.player.points++; }
+        document.getElementById(`stat-${stat}`).innerText = game.player[stat];
+        document.getElementById('points-left').innerText = game.player.points;
+    }
+
+    function confirmCharacter() {
+        initAudio(); playSound('click');
+        
+        if(game.player.points > 0) {
+            openAlert("교장 선생님", "스탯 10개를 모두 분배해야 입학을 허가하겠다! 아직 남은 스탯이 있다.");
+            return;
+        }
+
+        const name = document.getElementById('playerName').value;
+        if(!/^[가-힣]{2,4}$/.test(name)) return openAlert("오류", "이름은 한글 2~4글자로 입력하세요.");
+        game.player.name = name;
+        
+        const colors = ['#000', '#8B4513', '#FFD700', '#FF4500', '#555'];
+        const shirts = ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6'];
+        document.getElementById('pl-hair').style.background = colors[Math.floor(Math.random()*colors.length)];
+        document.getElementById('pl-body').style.background = shirts[Math.floor(Math.random()*shirts.length)];
+        
+        game.score = 50.0; game.hunger = 100; game.coins = saves.coins; game.inv = saves.inv;
+        
+        buildSchedule();
+        document.getElementById('status-board').style.display = 'block';
+        document.getElementById('pixel-player').style.display = 'block';
+        updateUI();
+        executePhase();
+    }
+
+    /* ---------------- 코어 루프 ---------------- */
+    function buildSchedule() {
+        let subs = (game.grade === 1) ? ["국어","수학","사회","과학","영어","체육"] : (game.grade === 2) ? ["국어","수학","역사","과학","체육"] : ["국어","수학","사회","역사","과학","체육"];
+        schedule = [{ type: 'run', text: '지각 위기! 뛰어라!' }, { type: 'assembly', text: '조례 시간' }, { type: 'break', title: '쉬는시간', duration: 10, place: 'class' }];
+        let lastSub = "";
+        let bbText = "<h3 style='margin:5px;'>오늘 시간표</h3><ul style='text-align:left; font-size:12px; margin:0; padding-left:20px; line-height:1.2;'>";
+        
+        for(let i=1; i<=7; i++) {
+            let avail = subs.filter(s => s !== lastSub); if(avail.length === 0) avail = subs;
+            let sub = avail[Math.floor(Math.random() * avail.length)];
+            schedule.push({ type: 'class', period: `${i}교시`, subject: sub }); lastSub = sub;
+            bbText += `<li>${i}교시: ${sub}</li>`;
+            
+            if(i === 4) { 
+                schedule.push({ type: 'lunch_run', text: '급식실로 뛰어라!' }); 
+                bbText += `<li style="color:yellow; font-weight:bold;">점심시간 (급식)</li>`;
+            }
+            else if(i < 7) schedule.push({ type: 'break', title: '쉬는시간', duration: 10, place: 'hallway' });
+        }
+        schedule.push({ type: 'end' });
+        bbText += "</ul>";
+        todayScheduleHTML = bbText;
+    }
+
+    function executePhase() {
+        if(game.phase >= schedule.length) return;
+        let ev = schedule[game.phase]; game.phase++;
+        
+        showScreen('screen-game-ui');
+        document.getElementById('run-ui').style.display = 'none';
+        document.getElementById('dialog-ui').style.display = 'none';
+        document.getElementById('btn-pause').style.display = 'block'; // 게임 중 일시정지 버튼 표시 활성화
+        
+        // 허기 감소
+        updateHunger(-5);
+        if(game.hunger <= 0) return; // 죽었으면 중단
+
+        if(ev.type === 'run') {
+            openAlert("경고", "지각 직전이다! 빨리 뛰어야 해!", () => {
+                startRun('late');
+            });
+        }
+        else if(ev.type === 'lunch_run') startRun('lunch', ev);
+        else if(ev.type === 'assembly') {
+            setBackground('class');
+            teacherEnterAnim(() => {
+                typewriterDialog("담임 선생님", "다들 자리에 앉아라. 오늘 하루도 무사히 보내도록.", [{t:"네!", f:executePhase}]);
+            });
+        }
+        else if(ev.type === 'class') startClass(ev);
+        else if(ev.type === 'break') startBreak(ev);
+        else if(ev.type === 'end') {
+            setBackground('class');
+            teacherEnterAnim(() => {
+                typewriterDialog("담임 선생님", `종례 시간이다. 오늘 하루 수고 많았다. ${game.player.name}, 하교해라!`, [{t:"안녕히 계세요!", f:()=>endGame(true, "무사히 종례를 마쳤습니다!")}]);
+            });
+        }
+    }
+
+    // 포켓몬 스타일 타이핑 효과
+    function typewriterDialog(title, text, choices) {
+        document.getElementById('dialog-ui').style.display = 'block';
+        let titleHtml = `<strong>[${title}]</strong><br>`;
+        let textBox = document.getElementById('dialog-text');
+        let choicesBox = document.getElementById('dialog-choices');
+        
+        textBox.innerHTML = titleHtml;
+        choicesBox.innerHTML = '';
+        
+        if(typingInterval) clearInterval(typingInterval);
+        let i = 0;
+        typingInterval = setInterval(() => {
+            textBox.innerHTML += text.charAt(i); i++;
+            if(i >= text.length) {
+                clearInterval(typingInterval);
+                renderChoices(choices, choicesBox);
+            }
+        }, 30);
+    }
+    
+    function renderChoices(choices, container) {
+        let html = '';
+        choices.forEach((c, idx) => { 
+            let ex = c.disabled ? "disabled style='opacity:0.5;'" : "";
+            html += `<button class="choice-btn" id="btn-c${idx}" ${ex}>${c.t}</button>`; 
+        });
+        container.innerHTML = html;
+        choices.forEach((c, idx) => { 
+            if(!c.disabled) {
+                document.getElementById(`btn-c${idx}`).onclick = () => { playSound('click'); c.f(); }; 
+            }
+        });
+    }
+
+    function teacherEnterAnim(cb) {
+        let tc = document.getElementById('teacher-sprite');
+        tc.style.display = 'block'; tc.style.left = '-60px';
+        setTimeout(() => { tc.style.left = '30%'; setTimeout(cb, 1000); }, 50);
+    }
+
+    function updateScore(amt) {
+        // 난이도에 따른 점수 및 코인 계산
+        let finalAmt = 0; let cEarn = 0;
+        if(game.diffStr === 'easy') { finalAmt = amt; cEarn = amt > 0 ? amt : 0; }
+        else if(game.diffStr === 'normal') { finalAmt = amt * 0.5; cEarn = amt > 0 ? (finalAmt / 0.5) : 0; }
+        else if(game.diffStr === 'hard') { finalAmt = amt * 0.2; cEarn = amt > 0 ? (finalAmt / 0.2) : 0; }
+        
+        game.score += finalAmt; game.coins += cEarn; saves.coins = game.coins; saveGameData();
+        
+        if(game.score > 100) game.score = 100;
+        if(game.score <= 0) { game.score = 0; endGame(false, "점수가 0점이 되어 조퇴 처리되었습니다."); return; }
+        updateUI();
+    }
+    
+    function updateHunger(amt) {
+        game.hunger += amt;
+        if(game.hunger > 100) game.hunger = 100;
+        if(game.hunger <= 0) { game.hunger = 0; endGame(false, "허기가 떨어져 쓰러졌습니다... (강제 조퇴)"); }
+        updateUI();
+    }
+
+    function updateUI() {
+        document.getElementById('score-text').innerText = game.score.toFixed(1);
+        document.getElementById('hunger-text').innerText = game.hunger;
+        document.getElementById('coin-text').innerText = game.coins;
+        document.getElementById('coin-text-top').innerText = game.coins; // 최상단 거대 코인 업데이트
+    }
+
+    function endGame(isClear, msg="") {
+        stopTimer();
+        document.getElementById('btn-pause').style.display = 'none'; // 일시정지 버튼 숨김
+        if(isClear) {
+            // 기록 저장
+            let key = `g${game.grade}_${game.diffStr}`;
+            let unlockedNext = false;
+            
+            if(game.score > saves.unlocks[key]) saves.unlocks[key] = game.score;
+            
+            // 다음 난이도 해금 여부 체크
+            if(game.diffStr === 'easy') {
+                saves.unlocks[`g${game.grade}_easy`] = Math.max(saves.unlocks[`g${game.grade}_easy`], game.score);
+                unlockedNext = 'normal';
+            } else if (game.diffStr === 'normal') {
+                saves.unlocks[`g${game.grade}_normal`] = Math.max(saves.unlocks[`g${game.grade}_normal`], game.score);
+                unlockedNext = 'hard';
+            }
+            saveGameData();
+            
+            let buttons = [{text: "돌아가기", f: ()=>location.reload()}];
+            if (unlockedNext) {
+                buttons.push({
+                    text: "다음 난이도 가기", 
+                    f: () => {
+                        game.diffStr = unlockedNext;
+                        showScreen('screen-create');
+                    }
+                });
+            }
+            openAlert("하교 완료 (게임 클리어!)", `최종 점수: ${game.score.toFixed(1)}점\n\n${msg}`, buttons);
+        } else {
+            openAlert("게임 오버", msg, [{text: "돌아가기", f: ()=>location.reload()}]);
+        }
+    }
+
+    // --- 타이머 ---
+    function startTimer(sec, onTimeout, onTick) {
+        clearInterval(timerInterval); timerRemaining = sec * 10; timerCallback = onTimeout;
+        document.getElementById('timer-display').style.display = 'inline-block';
+        updateTimerText();
+        timerInterval = setInterval(() => {
+            if(!isPaused) {
+                timerRemaining--; updateTimerText();
+                if(onTick) onTick(timerRemaining);
+                if(timerRemaining <= 0) { clearInterval(timerInterval); timerCallback(); }
+            }
+        }, 100);
+    }
+    function updateTimerText() {
+        let s = Math.floor(timerRemaining/10); let ms = timerRemaining%10;
+        document.getElementById('timer-display').innerText = `0${s}:${ms}0`;
+    }
+    function stopTimer() { clearInterval(timerInterval); document.getElementById('timer-display').style.display = 'none'; }
+
+    /* ---------------- 이벤트: 달리기 ---------------- */
+    let runClicks = 0; let targetClicks = 0; let runBgPos = 0;
+    let runType = 'late';
+    function startRun(type = 'late') {
+        runType = type;
+        setBackground('hallway');
+        document.getElementById('run-ui').style.display = 'block';
+        runClicks = 0; targetClicks = 30 - (game.player.str * 2); if(targetClicks<5) targetClicks=5;
+        runBgPos = 0;
+        document.getElementById('bg-hallway').style.setProperty('--bg-x', `0px`);
+        
+        let timeSec = 5 + game.player.cha; 
+        if(runType === 'lunch') {
+            document.querySelector('#run-ui button').innerText = "급식실로 달려!! 탭!";
+            timeSec += 2; 
+        } else {
+            document.querySelector('#run-ui button').innerText = "달려라!! 탭!";
+        }
+        
+        document.getElementById('run-sign').innerText = runType === 'late' ? "1반 앞을 향해 뛰는 중!" : "달리는 중...";
+        document.getElementById('run-sign').style.display = 'inline-block';
+        
+        startTimer(timeSec, () => {
+            if(runType === 'lunch') {
+                playSound('wrong'); openAlert("아뿔싸!", "늦게 가서 맛있는 반찬이 다 떨어졌다... (-5점)", ()=> { updateScore(-5); executePhase(); });
+            } else {
+                playSound('wrong'); openAlert("지각!", "선도부에게 걸렸습니다. (-10점)", ()=> { updateScore(-10); executePhase(); });
+            }
+        });
+    }
+    function doRunClick() {
+        if(isPaused) return;
+        playSound('run'); runClicks++; updateHunger(-1);
+        let player = document.getElementById('pixel-player');
+        player.style.bottom = (runClicks % 2 === 0) ? "20%" : "25%";
+        
+        // 달릴 때만 배경 이동 (운동 스탯 비례 속도)
+        let speed = 20 + (game.player.str * 5);
+        runBgPos -= speed;
+        document.getElementById('bg-hallway').style.setProperty('--bg-x', `${runBgPos}px`);
+        
+        if (runType === 'late') {
+            let pct = runClicks / targetClicks;
+            if(pct < 0.25) document.getElementById('run-sign').innerText = "1반 앞을 지나치는 중...";
+            else if(pct < 0.5) document.getElementById('run-sign').innerText = "2반 앞을 지나치는 중...";
+            else if(pct < 0.75) document.getElementById('run-sign').innerText = "3반 앞을 지나치는 중...";
+            else document.getElementById('run-sign').innerText = "우리반 도착 직전!!";
+        }
+        
+        if(runClicks >= targetClicks) {
+            stopTimer(); playSound('correct');
+            document.getElementById('run-ui').style.display = 'none';
+            if(runType === 'lunch') {
+                updateHunger(50);
+                typewriterDialog("급식실", "급식을 다 먹고 교실로 돌아왔다.", [{t:"남은 시간 교실에서 쉬기", f:()=>startBreak({title:'점심시간', duration:50}, true)}]);
+            } else {
+                openAlert("세이프!", "무사히 교실에 도착했습니다! (+5점)", ()=> { updateScore(5); executePhase(); });
+            }
+        }
+    }
+
+    /* ---------------- 이벤트: 수업 ---------------- */
+    function startClass(ev) {
+        if(ev.subject === '체육') {
+            // 학생들 나가는 애니메이션 (임시로 교실 지우기)
+            setBackground('yard');
+            document.getElementById('teacher-sprite').style.display = 'none';
+            typewriterDialog("체육 선생님", "자, 다들 모였나! 수행평가를 시작한다.", [{t:"시작!", f:startPEMinigame}]);
+            return;
+        }
+
+        setBackground('class');
+        document.getElementById('teacher-sprite').style.display = 'block';
+        
+        let subDB = qDB[game.grade][ev.subject];
+        let classEvents = [45, 30, 15];
+
+        function teachAndAsk(remSec) {
+            isPaused = true;
+            let qData = subDB[Math.floor(Math.random()*subDB.length)];
+            document.getElementById('bb-content').innerHTML = `<h3 style='margin:5px;'>${ev.period} - ${ev.subject}</h3><p style='margin:5px;'>수업 진행 중...</p>`;
+            
+            let presentChoices = [
+                {
+                    t: "🙋 직접 손 들기",
+                    f: () => {
+                        playSound('click');
+                        typewriterDialog("선생님", "좋아, 네가 풀어봐라.", [{
+                            t: "문제 보기", f: () => { showQuiz(qData, true, () => { isPaused=false; continueClass(remSec); }); }
+                        }]);
+                    }
+                },
+                {
+                    t: "🤫 가만히 눈치보기 (룰렛)",
+                    f: () => {
+                        playSound('run');
+                        let allStudents = [...friends, game.player.name];
+                        let picked = allStudents[Math.floor(Math.random() * allStudents.length)];
+                        if (picked === game.player.name) {
+                            typewriterDialog("선생님", `룰렛 결과... ${picked}! 나와서 풀어라.`, [{
+                                t: "헉... (문제 풀기)", f: () => { showQuiz(qData, false, () => { isPaused=false; continueClass(remSec); }); }
+                            }]);
+                        } else {
+                            typewriterDialog("선생님", `룰렛 결과... ${picked}! 정답이 뭐지?\n${picked}: "정답은 [${qData.c[qData.a]}] 입니다!"`, [{
+                                t: "휴, 다행이다...", f: () => { playSound('correct'); updateScore(2); isPaused=false; continueClass(remSec); }
+                            }]);
+                        }
+                    }
+                }
+            ];
+
+            if(game.inv.skip > 0) {
+                presentChoices.push({
+                    t: "🎟️ [아이템] 발표 면제권 사용",
+                    f: () => {
+                        playSound('click');
+                        game.inv.skip--; saveGameData();
+                        typewriterDialog("선생님", "그래, 면제권을 썼군. 넘어가지!", [{t:"휴...", f:() => { isPaused=false; continueClass(remSec); }}]);
+                    }
+                });
+            }
+
+            typewriterDialog("선생님", `"${qData.s}"\n\n자, 이 부분에서 질문이다. 발표해볼 사람?`, presentChoices);
+        }
+        
+        function showQuiz(qInfo, isHighStakes, onComplete) {
+            let buildChoices = (useEraser) => {
+                let choices = [];
+                let wIdx = [0,1,2,3].filter(i => i !== qInfo.a).sort(()=>Math.random()-0.5);
+                let elim = wIdx.slice(0, Math.floor(game.player.int / 3)); 
+                if(useEraser) { elim.push(wIdx[elim.length]); elim.push(wIdx[elim.length+1]); }
+                
+                qInfo.c.forEach((cText, i) => {
+                    if(elim.includes(i)) return;
+                    choices.push({
+                        t: `${i+1}. ${cText}`,
+                        f: () => {
+                            stopTimer();
+                            let pts = isHighStakes ? 15 : 10;
+                            if(i === qInfo.a) { 
+                                playSound('correct'); updateScore(pts); 
+                                typewriterDialog("선생님", `정답이다! 아주 잘했어.`, [{t:"다음", f:onComplete}]); 
+                            } else { 
+                                let randFriend = friends[Math.floor(Math.random() * friends.length)];
+                                playSound('wrong'); updateScore(-pts); 
+                                typewriterDialog("선생님", `틀렸다. 감점! ${randFriend}, 네가 대신 답해볼까?\n${randFriend}: "정답은 [${qInfo.c[qInfo.a]}] 입니다."`, [{t:"대단하다...", f:onComplete}]); 
+                            }
+                        }
+                    });
+                });
+                
+                if(game.inv.eraser > 0 && !useEraser) choices.push({ t:"[아이템] 마법 지우개 사용", f:()=>{ game.inv.eraser--; saveGameData(); buildChoices(true); } });
+                
+                document.getElementById('bb-content').innerHTML = `<h3 style='margin:5px;'>${ev.period} - ${ev.subject}</h3><p style='margin:5px;'>${qInfo.q}</p>`;
+                typewriterDialog("선생님", `${qInfo.q}\n\n정답을 골라라!`, choices);
+            };
+            
+            buildChoices(false);
+            startTimer(10, () => {
+                playSound('wrong'); updateScore(-10);
+                let randFriend = friends[Math.floor(Math.random() * friends.length)];
+                typewriterDialog("선생님", `시간초과! 감점이다. ${randFriend}, 네가 대신 답해볼까?\n${randFriend}: "정답은 [${qInfo.c[qInfo.a]}] 입니다."`, [{t:"아쉽다", f:onComplete}]);
+            });
+        }
+
+        function continueClass(remDeciSec) {
+            document.getElementById('bb-content').innerHTML = `<h3 style='margin:5px;'>${ev.period} - ${ev.subject}</h3><p style='margin:5px;'>수업 진행 중...</p>`;
+            typewriterDialog("수업중", "선생님의 수업이 진행 중입니다...", []);
+            
+            startTimer(remDeciSec / 10, () => {
+                playSound('correct');
+                typewriterDialog("선생님", "수업 끝! 다들 고생했다.", [{t:"다음", f:executePhase}]);
+            }, (currentRem) => {
+                let sec = Math.floor(currentRem/10);
+                if (currentRem % 10 === 0 && classEvents.includes(sec)) {
+                    classEvents = classEvents.filter(e => e !== sec);
+                    stopTimer(); 
+                    teachAndAsk(currentRem); 
+                }
+            });
+        }
+
+        // 시작 시 600데시초(60초) 전달
+        continueClass(600);
+    }
+
+    /* ---------------- 미니게임: 체육 ---------------- */
+    let peInterval = null; let peTarget = 3; let peCount = 0;
+    
+    function startPEMinigame() {
+        if(game.inv.peClothes > 0) {
+            typewriterDialog("체육", "[아이템] 체육복 대여로 자동 패스!", [
+                {t:"사용하기", f:()=>{ game.inv.peClothes--; saveGameData(); updateScore(10); executePhase(); }},
+                {t:"직접 하기", f:runPE}
+            ]);
+        } else { runPE(); }
+    }
+
+    function runPE() {
+        let sports = ["배구", "축구", "농구", "야구"];
+        let sport = sports[Math.floor(Math.random()*sports.length)];
+        let emojis = {"배구":"🏐", "축구":"⚽", "농구":"🏀", "야구":"⚾"};
+        
+        let obj = document.getElementById('pe-object');
+        obj.innerText = emojis[sport]; obj.style.display = 'block';
+        
+        peTarget = 3; peCount = 0;
+        document.getElementById('dialog-ui').style.display = 'none';
+        document.getElementById('pe-game').style.display = 'block';
+        document.getElementById('pe-title').innerText = `${sport} 수행평가! (3회 연속 성공)`;
+        document.getElementById('pe-count').innerText = peCount + " / 3";
+        
+        let zoneWidth = 15 + (game.player.str * 2);
+        let tz = document.getElementById('timing-zone');
+        tz.style.width = `${zoneWidth}%`; tz.style.left = `${50 - zoneWidth/2}%`;
+        
+        let cursor = document.getElementById('timing-cursor');
+        let pos = 0; let dir = 3 + (game.diffStr==='hard'?2:0);
+        
+        let btnHit = document.getElementById('btn-pe-hit');
+        if(!btnHit) {
+            btnHit = document.createElement('button');
+            btnHit.innerText = "치기!";
+            btnHit.id = "btn-pe-hit";
+            btnHit.style.fontSize = "24px"; btnHit.style.padding = "10px 30px"; btnHit.style.marginTop = "10px";
+            document.getElementById('pe-game').appendChild(btnHit);
+        }
+        
+        let barBg = document.getElementById('pe-bar-bg');
+        barBg.style.display = 'none';
+        btnHit.style.display = 'none';
+        
+        // 공 다가오기 연출
+        obj.style.transition = '1s linear';
+        obj.style.top = '10%'; obj.style.left = '50%';
+        
+        setTimeout(() => {
+            // 내 몸에 완벽하게 멈춤
+            obj.style.top = '75%';
+            
+            setTimeout(() => {
+                // 바 나타남
+                obj.style.transition = 'none';
+                barBg.style.display = 'block';
+                btnHit.style.display = 'inline-block';
+                
+                peInterval = setInterval(() => {
+                    if(isPaused) return;
+                    pos += dir; if(pos >= 100 || pos <= 0) dir *= -1;
+                    cursor.style.left = `${pos}%`;
+                }, 20);
+                
+                btnHit.onclick = () => {
+                    if(document.getElementById('pe-game').style.display === 'none') return; 
+                    let zLeft = parseFloat(tz.style.left); let zRight = zLeft + zoneWidth;
+                    if(pos >= zLeft && pos <= zRight) {
+                        playSound('correct'); peCount++;
+                        document.getElementById('pe-count').innerText = peCount + " / 3";
+                        
+                        clearInterval(peInterval);
+                        barBg.style.display = 'none';
+                        btnHit.style.display = 'none';
+                        
+                        // 공 날아가기 연출
+                        obj.style.transition = '0.5s ease-out';
+                        obj.style.top = '-10%';
+                        
+                        if(peCount >= peTarget) {
+                            setTimeout(() => {
+                                obj.style.display='none'; document.getElementById('pe-game').style.display = 'none';
+                                updateScore(10);
+                                typewriterDialog("체육 완료!", "완벽하다! 수행평가 만점! (+10점)", [{t:"다음", f:executePhase}]);
+                            }, 500);
+                        } else {
+                            setTimeout(() => {
+                                // 다음 공 준비
+                                obj.style.transition = 'none';
+                                obj.style.top = '10%'; obj.style.left = '50%';
+                                setTimeout(() => {
+                                    obj.style.transition = '1s linear';
+                                    obj.style.top = '75%'; // 캐릭터 몸에 다시 붙음
+                                    setTimeout(() => {
+                                        obj.style.transition = 'none';
+                                        barBg.style.display = 'block';
+                                        btnHit.style.display = 'inline-block';
+                                        peInterval = setInterval(() => {
+                                            if(isPaused) return;
+                                            pos += dir; if(pos >= 100 || pos <= 0) dir *= -1;
+                                            cursor.style.left = `${pos}%`;
+                                        }, 20);
+                                    }, 1000);
+                                }, 100);
+                            }, 500);
+                        }
+                    } else { 
+                        playSound('wrong'); updateScore(-10); // 실패 시 점수 크게 하락
+                        peCount = 0; // 실패시 초기화
+                        document.getElementById('pe-count').innerText = peCount + " / 3";
+                        typewriterDialog("앗!", "타이밍을 놓쳤다! 연속 성공 횟수가 초기화되고 점수가 깎였다 (-10점).", [{t:"다시 도전", f:()=> {
+                            clearInterval(peInterval);
+                            barBg.style.display = 'none';
+                            btnHit.style.display = 'none';
+                            obj.style.transition = 'none';
+                            obj.style.top = '10%'; obj.style.left = '50%';
+                            setTimeout(() => {
+                                obj.style.transition = '1s linear';
+                                obj.style.top = '75%'; // 캐릭터 몸에 다시 붙음
+                                setTimeout(() => {
+                                    obj.style.transition = 'none';
+                                    barBg.style.display = 'block';
+                                    btnHit.style.display = 'inline-block';
+                                    peInterval = setInterval(() => {
+                                        if(isPaused) return;
+                                        pos += dir; if(pos >= 100 || pos <= 0) dir *= -1;
+                                        cursor.style.left = `${pos}%`;
+                                    }, 20);
+                                }, 1000);
+                            }, 100);
+                        }}]);
+                    }
+                };
+            }, 1000);
+        }, 100);
+    }
+
+    /* ---------------- 이벤트: 쉬는시간 ---------------- */
+    function startBreak(ev, extraAction = false) {
+        setBackground('class'); // 항상 교실 배경 유지
+        let choices = [];
+        
+        let nextEv = schedule[game.phase];
+        
+        // 체육시간 전 운동장 나가기 이벤트
+        if (!extraAction && nextEv && nextEv.type === 'class' && nextEv.subject === '체육') {
+            return typewriterDialog("알림", "다음 시간은 체육이다. 운동장으로 나가자!", [
+                {t:"이동하기", f:()=>{ setBackground('yard'); startBreak(ev, true); }}
+            ]);
+        }
+        
+        // 숙제 확인 이벤트 (수업 전 쉬는시간, 인성 비례 확률)
+        if (!extraAction && nextEv && nextEv.type === 'class' && nextEv.subject !== '체육') {
+            if (Math.random() < (0.1 + game.player.cha * 0.1)) {
+                return typewriterDialog("앗!", `다음 ${nextEv.subject} 시간에 숙제 검사가 있다는 게 생각났다!`, [
+                    {t:"지금 빨리 한다", f:()=>{ updateScore(3); startBreak(ev, true); }},
+                    {t:"포기한다", f:()=>{ startBreak(ev, true); }}
+                ]);
+            }
+        }
+        
+        // 랜덤 돌발 이벤트
+        if (!extraAction && Math.random() < 0.2) {
+            let rnd = Math.random();
+            if(rnd < 0.5) {
+                return typewriterDialog("돌발상황", "반 친구들이 사소한 일로 다투고 있다!", [
+                    {t:"말린다", f:()=>{ if(game.player.cha >=3){ updateScore(2); typewriterDialog("결과","잘 해결되었다.",[{t:"다행이다", f:()=>startBreak(ev, true)}]); } else { updateScore(-2); typewriterDialog("결과","오히려 나까지 말려들었다...",[{t:"아차", f:()=>startBreak(ev, true)}]); } }},
+                    {t:"구경한다", f:()=>{ startBreak(ev, true); }}
+                ]);
+            } else {
+                return typewriterDialog("돌발상황", "복도를 걷다 물기에 미끄러졌다!", [
+                    {t:"균형 잡기", f:()=>{ if(game.player.str >=3){ updateScore(2); typewriterDialog("결과","멋지게 턴을 하며 착지했다!",[{t:"휴", f:()=>startBreak(ev, true)}]); } else { updateScore(-2); typewriterDialog("결과","엉덩방아를 찧었다...",[{t:"아야", f:()=>startBreak(ev, true)}]); } }}
+                ]);
+            }
+        }
+
+        let build = () => {
+            choices = [];
+            choices.push({t:"조용히 쉬기", f:()=>{updateHunger(-2); updateScore(2); executePhase();}});
+            
+            if(game.player.soc >= 3) {
+                choices.push({t:"친구랑 수다 떨기", f:()=>{updateScore(4); executePhase();}});
+            } else {
+                choices.push({t:"친구에게 말걸기 (친밀 부족)", disabled: true});
+            }
+            choices.push({t:"매점 뛰어가기", f:()=>{
+                updateHunger(-10);
+                typewriterDialog("매점", "빵을 샀다!", [{t:"먹기", f:()=>{updateHunger(15); updateScore(3); executePhase();}}]);
+            }});
+            
+            if(game.inv.snack > 0) {
+                choices.push({t:`[아이템] 간식 먹기`, f:()=>{
+                    game.inv.snack--; saveGameData(); updateHunger(30); playSound('correct');
+                    build(); // 행동 소모 안 함
+                }});
+            }
+            typewriterDialog(`${ev.title} (${ev.duration}분)`, "무엇을 할까?", choices);
+        };
+        build();
+    }
+
+    /* ---------------- 모달 & 유틸 ---------------- */
+    function openPauseMenu() { playSound('click'); isPaused = true; document.getElementById('modal-pause').style.display = 'flex'; }
+    
+    function openAlert(title, desc, buttonsOrCallback) {
+        document.getElementById('dialog-ui').style.display = 'none';
+        document.getElementById('alert-title').innerText = title;
+        document.getElementById('alert-desc').innerText = desc;
+        document.getElementById('modal-alert').style.display = 'flex';
+        
+        let btnContainer = document.getElementById('alert-buttons');
+        btnContainer.innerHTML = '';
+        
+        if (typeof buttonsOrCallback === 'function' || !buttonsOrCallback) {
+            let btn = document.createElement('button');
+            btn.innerText = '확인';
+            btn.onclick = () => {
+                playSound('click'); document.getElementById('modal-alert').style.display = 'none';
+                if(buttonsOrCallback) buttonsOrCallback();
+            };
+            btnContainer.appendChild(btn);
+        } else if (Array.isArray(buttonsOrCallback)) {
+            buttonsOrCallback.forEach(b => {
+                let btn = document.createElement('button');
+                btn.innerText = b.text;
+                btn.onclick = () => {
+                    playSound('click'); document.getElementById('modal-alert').style.display = 'none';
+                    if(b.f) b.f();
+                };
+                btnContainer.appendChild(btn);
+            });
+        }
+    }
+    
+    function openSettings() { playSound('click'); document.getElementById('modal-settings').style.display = 'flex'; isPaused = true; }
+    function closeAlert() { playSound('click'); document.getElementById('modal-alert').style.display = 'none'; }
+    function closeModal(id) { 
+        playSound('click'); 
+        document.getElementById(id).style.display = 'none'; 
+        // 설정 창을 닫았을 때, 일시정지 창이 떠있지 않다면(게임 중 설정) 시간 다시 흐름
+        if(id === 'modal-pause' || (id === 'modal-settings' && document.getElementById('modal-pause').style.display === 'none')) {
+            isPaused = false; 
+        } 
+    }
+</script>
+</body>
+</html>
